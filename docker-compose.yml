@@ -1,0 +1,41 @@
+services:
+  streamlit:
+    image: python:3.11-slim
+    container_name: ecommerce_streamlit_ai
+    working_dir: /app
+    ports:
+      - "8501:8501"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./streamlit:/app
+    depends_on:
+      - redis
+    command: >
+      bash -c "
+      pip install --no-cache-dir -r requirements.txt &&
+      streamlit run app.py --server.address=0.0.0.0 --server.port=8501
+      "
+
+  redis:
+    image: redis:7
+    container_name: ecommerce_redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ecommerce_redis_commander
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:
