@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import json
 from datetime import datetime
 
 import pandas as pd
@@ -180,7 +181,8 @@ def guardar_historial(pregunta: str, numero_pedido: str, respuesta: str, categor
         "respuesta": respuesta
     }
 
-    redis_client.lpush("historial_consultas", str(registro))
+    # Guardar como JSON para poder convertirlo luego en tabla
+    redis_client.lpush("historial_consultas", json.dumps(registro, ensure_ascii=False))
     redis_client.ltrim("historial_consultas", 0, 49)
 
     redis_client.hincrby("metricas", "total_consultas", 1)
@@ -317,11 +319,33 @@ st.bar_chart(df_categorias.set_index("Categoría"))
 # Historial
 # =========================
 st.subheader("🕘 Historial reciente")
+
 historial = redis_client.lrange("historial_consultas", 0, 9)
 
 if historial:
+    registros = []
+
     for item in historial:
-        st.code(item)
+        try:
+            registros.append(json.loads(item))
+        except json.JSONDecodeError:
+            pass
+
+    if registros:
+        df_historial = pd.DataFrame(registros)
+
+        # Ordenar columnas para que se vea mejor
+        df_historial = df_historial[
+            ["fecha", "pedido", "categoria", "origen", "pregunta", "respuesta"]
+        ]
+
+        st.dataframe(
+            df_historial,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("No se pudo convertir el historial en tabla.")
 else:
     st.write("Todavía no hay consultas registradas.")
 
